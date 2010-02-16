@@ -9,16 +9,18 @@
 var scene, tr1, tr2;
 window.onload = function() {
     scene = new Filippo.Scene( 'mycanvas' );
-    tr1 = new Filippo.objects.TorusZ( scene, '#66ccff', '#66ccff', '#222222', 1, 4, 16, .9, 8 );
+
+    tr1 = new Filippo.objects.TorusZ( scene, '#66ccff', '#66ccff', '#222222', 1, 50, 4, 16, .9, 8 );
     tr1.shift( 0, 2, 0 );
-    tr2 = new Filippo.objects.TorusX( scene, '#f0f0f0', '#f0f0f0', '#444444', 1, 3, 24, .9, 8 );
+
+    tr2 = new Filippo.objects.TorusX( scene, '#f0f0f0', '#f0f0f0', '#444444', 1, 50, 3, 24, .9, 8 );
     tr2.shift( 0, -2, 0 );
+
     scene.centerAuto();
     scene.center.zoom( 0.0 );
     scene.zoom_all *= 1.4;
     scene.changeView( -50, 0 );
     scene.changeLight( -20, -30 );
-    scene.sort();
     scene.render();
 
     window.setInterval( function() {
@@ -26,7 +28,6 @@ window.onload = function() {
         tr2.rotateX( 10, 1 );
         scene.changeView( 0, -5 );
         scene.changeLight( 0, -5 );
-        scene.sort();
         scene.render();
     }, 100 );
 };

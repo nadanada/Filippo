@@ -1,0 +1,23 @@
+ABOUT
+
+Filippo is a Javascript 3D Vector Library named after Filippo Brunelleschi,
+one of the foremost architects and engineers of the Italian Renaissance and
+inventor of linear perspective. Filippo uses SVG/VML, so no plugin is
+required.
+
+
+TODO
+
+- complete pyramid object
+- more extensive IE tests
+- Rubik's Cube iPhone App (half way through)
+- pluggable Scene-Navigator (up/down/left/right; with Shift: Light); Filippo.navigators.basic, ...
+- cones, balls
+- build customizable animation mechanism for either scenes and objects
+- grid is currently restricted to 12 entries
+- animation: setTimeout handling from Elise
+- 3d images?
+- port Wolfenstein and some ChromeExperiments examples
+- use Vector instead of Coordinate, add toCoord, normalize, zoom to Vector class
+- morphing/start with changing appearance attributes at runtime
+- fast mode: path/color only
