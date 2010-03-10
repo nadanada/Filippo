@@ -3,17 +3,27 @@
 
 <title>Filippo Examples: Torus</title>
 
+<style type="text/css">
+
+body {
+    background-color: #000;
+    color: #bfbfbf;
+    font-size: 12px;
+    font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Arial, sans-serif;    
+}
+
+</style>
+
 <script language="JavaScript" type="text/javascript" src="../filippo.js"></script>
 <script language="JavaScript" type="text/javascript">
 
-var scene, tr1, tr2;
 window.onload = function() {
-    scene = new Filippo.Scene( 'mycanvas' );
+    var scene = new Filippo.Scene( 'mycanvas' );
 
-    tr1 = new Filippo.objects.TorusZ( scene, '#66ccff', '#66ccff', '#222222', 1, 50, 4, 16, .9, 8 );
+    var tr1 = new Filippo.objects.TorusZ( scene, '#66ccff', '#66ccff', '#222222', 1, 50, 4, 16, .9, 8 );
     tr1.shift( 0, 2, 0 );
 
-    tr2 = new Filippo.objects.TorusX( scene, '#f0f0f0', '#f0f0f0', '#444444', 1, 50, 3, 24, .9, 8 );
+    var tr2 = new Filippo.objects.TorusX( scene, '#f0f0f0', '#f0f0f0', '#444444', 1, 50, 3, 24, .9, 8 );
     tr2.shift( 0, -2, 0 );
 
     scene.centerAuto();
@@ -26,6 +36,7 @@ window.onload = function() {
     window.setInterval( function() {
         tr1.rotateZ( 10, 1 );
         tr2.rotateX( 10, 1 );
+
         scene.changeView( 0, -5 );
         scene.changeLight( 0, -5 );
         scene.render();
@@ -36,7 +47,7 @@ window.onload = function() {
 
 </head>
 
-<body bgcolor="#000000">
+<body>
     <div id="mycanvas" style="position: relative; width:320; height:320; overflow: hidden;"></div>
 </body>
 </html>

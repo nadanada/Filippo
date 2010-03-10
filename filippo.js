@@ -2,7 +2,6 @@
     /*
     Author:  Markus Nix <mnix@markusnix.com>
 
-
     BSD License
     -----------
 
@@ -29,24 +28,36 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
     Vector and Matrix Math is based on Sylvester <http://sylvester.jcoglan.com/>.
     Licensed under the MIT License.
     */
 
-    var LIBRARY    = 'Filippo';
-    var VERSION    = '0.5.0';
+    var LIBRARY         = 'Filippo';
+    var VERSION         = '0.7.0';
 
-    var NS_SVG     = 'http://www.w3.org/2000/svg';
-    var NS_VML     = 'urn:schemas-microsoft-com:vml';
+    var NS_SVG          = 'http://www.w3.org/2000/svg';
+    var NS_VML          = 'urn:schemas-microsoft-com:vml';
 
-    var M          = Math;
-    var PI_DIV_180 = M.PI / 180;
-    var PRECISION  = 1e-6;
-    var $i         = parseInt;
-    var d          = document;
-    var w          = window;
-    var b          = d.getElementsByTagName( 'body' )[0];
+    var SCENE_ID_PREFIX = 'scene-';
+    var POLY_ID_PREFIX  = 'poly-';
+
+    var M               = Math;
+    var PRECISION       = 1.0e-6;
+    var DEG_TO_RAD      = M.PI / 180;
+    var RAD_TO_DEG      = 180 / M.PI;
+
+    var SQRT_EIGHTH     = M.sqrt( 0.125 );
+    var SQRT_2          = M.sqrt( 2.0 );
+    var SQRT_3          = M.sqrt( 3.0 );
+    var SQRT_5          = M.sqrt( 5.0 );
+
+    var OBJECT_REF      = {};
+    var POLY_REF        = {};
+
+    var $i              = parseInt;
+    var $f              = parseFloat;
+    var $n              = isNaN;
+    var _d              = document;
 
 
     // common
@@ -127,23 +138,11 @@
         return unlinked;
     };
 
-    function $addEvent( elm, evType, fn, useCapture ) {
-        if ( elm.addEventListener ) {
-            elm.addEventListener( evType, fn, useCapture || false );
-        } else if ( elm.attachEvent ) {
-            elm.attachEvent( 'on' + evType, fn );
-        } else {
-            elm['on' + evType] = fn;
-        }
-
-        return elm;
-    };
-
     function $console( str, level ) {
-        var level = level || 'log';
+        level = level || 'log';
 
         try {
-            if ( w.console && ( level in console ) ) {
+            if ( console && ( level in console ) ) {
                 console[level]( LIBRARY + ': ', str );
             }
         } catch ( ex ) {
@@ -163,7 +162,7 @@
     };
 
     function $( id ) {
-        return ( $t( id ) === 'string' )? d.getElementById( id ) : id;
+        return ( $t( id ) === 'string' )? _d.getElementById( id ) : id;
     };
 
     function $append( elm, par ) {
@@ -176,10 +175,10 @@
             path: '<fvml:shape class="fvml">',
             line: '<fvml:line  class="fvml">',
             g:    '<fvml:group class="fvml">',
-            text: '<div>',
+            text: '<div>'
         };
 
-        var e = $extend( Client.hasSVG? d.createElementNS( NS_SVG, v ) : d.createElement( vml_map[v] ), {
+        var elm = $extend( Client.hasSVG? _d.createElementNS( NS_SVG, v ) : _d.createElement( vml_map[v] ), {
             attr: function( key, val ) {
                 if ( $t( arguments[0] ) == 'object' ) {
                     $each( arguments[0], function( v, k ) {
@@ -208,9 +207,7 @@
                             break;
 
                         case 'opacity':
-                            val /= 100;
-                            this.setAttribute( 'fill-opacity',   val );
-                            this.setAttribute( 'stroke-opacity', val );
+                            this.setAttribute( 'fill-opacity', val / 100 );
                             break;
 
                         case 'innerText':
@@ -254,6 +251,10 @@
                             this.style.color = val;
                             break;
 
+                        case 'opacity':
+                            // this.fillopacity = val;
+                            break;
+
                         default:
                             this[key] = val;
                     }
@@ -264,18 +265,16 @@
         } );
 
         if ( $t( attributes ) == 'object' ) {
-            $each( attributes, function( val, key ) {
-                e.attr( key, val );
-            } );
+            elm.attr( attributes );
         }
 
         if ( $t( styles ) == 'object' ) {
             $each( styles, function( val, key ) {
-                e.style[key] = val;
+                elm.style[key] = val;
             } );
         }
 
-        return e;
+        return elm;
     };
 
     Function.prototype.$bind = function( ctx ) {        var self = this;        
@@ -299,6 +298,7 @@
 
     Array.prototype.$fill = function( c, val ) {
         this.length = 0;
+
         for ( var i = 0; i < c; i++ ) {
             this[i] = val;
         }
@@ -484,7 +484,7 @@
     $t.s = Object.prototype.toString;
 
 
-    // class mechanism
+    // Class mechanism
 
     var Class = function( properties ) {
         properties = properties || {};
@@ -597,18 +597,18 @@
 
     var Client = ( function() {
         var ua      = navigator.userAgent.toLowerCase();
-        var isOpera = ( Object.prototype.toString.call( w.opera ) == '[object Opera]' );
-        var isIE    = ( !!w.attachEvent && !isOpera );
-        var hasSVG  = ( !isIE && d.implementation   && d.implementation.hasFeature( 'http://www.w3.org/TR/SVG11/feature#BasicStructure', '1.1' ) );
-        var hasVML  = ( isIE  && d.createStyleSheet && d.namespaces && ( function() {
-            var d = d.createElement( 'div' );
-            d.innerHTML = '<!--[if vml]<br><br><![endif]-->';
-            return ( d.childNodes.length == 2 );
+        var isOpera = ( Object.prototype.toString.call( window.opera ) == '[object Opera]' );
+        var isIE    = ( !!window.attachEvent && !isOpera );
+        var hasSVG  = ( !isIE && _d.implementation   && _d.implementation.hasFeature( 'http://www.w3.org/TR/SVG11/feature#BasicStructure', '1.1' ) );
+        var hasVML  = (  isIE && _d.createStyleSheet && _d.namespaces && ( function() {
+            var div = _d.createElement( 'div' );
+            div.innerHTML = '<!--[if vml]--><br><!--[endif]-->';
+            return ( div.childNodes.length == 3 );
         } )() );
 
         if ( hasVML ) {
-            d.createStyleSheet().addRule( '.fvml', 'behavior:url(#default#VML)' );
-            d.namespaces.add( 'fvml', NS_VML );
+            _d.createStyleSheet().addRule( '.fvml', 'behavior:url(#default#VML)' );
+            _d.namespaces.add( 'fvml', NS_VML );
         }
 
         return {
@@ -625,15 +625,23 @@
     } )();
 
 
-    // library
-    
+    // Util object
+
     var Util = {
+        identifyObject: function( evt, obj ) {
+            return OBJECT_REF[Client.hasSVG? evt.target.id : obj.id] || false;
+        },
+
+        identifyPoly: function( evt, obj ) {
+            return POLY_REF[Client.hasSVG? evt.target.id : obj.id]   || false;
+        },
+
         rnd: function( v ) {
             return M.floor( M.random() * v );
         },
 
-        eventTarget: function( evt ) {
-            return evt.target? evt.target : evt.srcElement;
+        degToRad: function( angle ) {
+            return ( angle / 180 ) * M.PI;
         },
 
         pathify: function( a ) {
@@ -669,6 +677,174 @@
         }
     };
 
+
+    // Event object
+
+    var Evt = ( function() {
+        function mapEventType( evType, elm ) {
+            if ( ( ( evType == 'keypress' ) && ( navigator.appVersion.match( /Konqueror|Safari|KHTML/ ) ) || elm.attachEvent ) ) {
+                evType = 'keydown';
+            }
+
+            if ( ( evType == 'mousewheel' ) && Client.Gecko ) {
+                evType = 'DOMMouseScroll';
+            }
+
+            return evType;
+        };
+
+        return {
+            register: function( elm, evType, fn, useCapture ) {
+                evType = mapEventType( evType.toLowerCase(), elm );
+
+                if ( elm.addEventListener ) {
+                    elm.addEventListener( evType, fn, useCapture || false );
+                } else if ( elm.attachEvent ) {
+                    elm.attachEvent( 'on' + evType, fn );
+                } else {
+                    elm['on' + evType] = fn;
+                }
+ 
+                return elm;
+            },
+
+            release: function( elm, evType, fn ) {
+                evType = mapEventType( evType.toLowerCase(), elm );
+
+                if ( elm.removeEventListener ) {
+                    elm.removeEventListener( evType, fn, false );
+                } else if ( elm.detachEvent ) {
+                    elm.detachEvent( 'on' + evType, fn );
+                } else {
+                    var et = evType.toUpperCase();
+
+                    if ( elm.Event && elm.Event[et] && elm.releaseEvents ) {
+                        elm.releaseEvents( Event[et] );
+                    }
+
+                    if ( elm['on' + evType] && ( elm['on' + evType] == fn ) ) {
+                        elm.et = null;
+                    }
+                }
+
+                return elm;
+            },
+
+            wheel: function( evt ) {
+                var delta = 0;
+        
+                if ( window.event ) {
+                    evt = window.event;
+                }
+        
+                if ( evt.wheelDelta ) {
+                    delta = evt.wheelDelta / 120;
+                } else if ( evt.detail ) {
+                    delta = -evt.detail / 3;
+                }
+
+                return M.round( delta );
+            },
+
+            isLeftClick: function( evt ) {
+                return ( ( evt.which || evt.button ) == 1 );
+            },
+
+            getTarget: function( evt ) {
+                return evt.target || evt.srcElement;
+            },
+
+            pos: function( evt, ele ) {
+                var t = l = 0;
+    
+                if ( window.event ) {
+                    evt = window.event;
+                }
+
+                do {
+                    t += ele.offsetTop  || 0;
+                    l += ele.offsetLeft || 0;
+                
+                    ele = ele.offsetParent;
+                } while ( ele );
+
+                return {
+                    x: ( evt.pageX || ( evt.clientX /*+ ( _d.documentElement.scrollLeft || _d.body.scrollLeft )*/ ) ) - l,
+                    y: ( evt.pageY || ( evt.clientY /*+ ( _d.documentElement.scrollTop  || _d.body.scrollTop  )*/ ) ) - t
+                };
+            },
+
+            stop: function( evt ) {
+                if ( window.event ) {
+                    evt = window.event;
+                }
+
+                if ( evt.preventDefault  ) evt.preventDefault();
+                if ( evt.stopPropagation ) evt.stopPropagation();
+
+                evt.cancelBubble = true;
+                evt.returnValue  = false;
+            },
+
+            enableKeyboard: function( keyHandler ) {
+                if ( document.addEventListener ) {
+                    Evt.register( document, 'keypress', keyHandler, true );
+                } else {
+                    if ( self.Event && self.Event.KEYPRESS ) {
+                        document.captureEvents( Event.KEYPRESS );
+                    }
+        
+                    document.onkeypress = keyHandler;
+                }
+    
+                // remap key codes
+                window.document.onkeydown = function( evt ) {
+                    if ( window.event ) {
+                        if ( window.event.ctrlKey || window.event.metaKey || window.event.altKey ) {
+                            return true;
+                        }
+        
+                        var k = window.event.keyCode;
+
+                        if ( k == 8 ) {
+                            keyHandler( {which:  8} );
+                        } else if ( k == 37 ) {
+                            keyHandler( {which: 28} );
+                        } else if ( k == 39 ) {
+                            keyHandler( {which: 29} );
+                        } else if ( k == 38 ) {
+                            keyHandler( {which: 30} );
+                        } else if ( k == 40 ) {
+                            keyHandler( {which: 31} );
+                        } else if ( k == 27 ) {
+                            keyHandler( {which: 27} );
+                        } else if ( ( k >= 57373 ) && ( k <= 57376 ) ) {
+                            if ( k == 57373 ) {
+                                keyHandler( {which: 30} );
+                            } else if ( k == 57374 ) {
+                                keyHandler( {which: 31} );
+                            } else if ( k == 57375 ) {
+                                keyHandler( {which: 28} );
+                            } else if ( k == 57376 ) {
+                                keyHandler( {which: 29} );
+                            }
+                        } else {
+                            window.event.cancleBubble = false;
+                            return true;
+                        }
+
+                        Evt.stop( evt );
+                        return false;
+                    }
+
+                    return true;
+                }
+            }
+        };
+    } )();
+
+
+    // Transition object
 
     var Transition = ( function() {
         function build( t, params ) {
@@ -714,6 +890,8 @@
     } )();
 
 
+    // Animation class
+
     var Animation = new Class( {
         initalize: function( options ) {
             this.options = $extend( {
@@ -733,7 +911,7 @@
                 var delta = this.options.transition( ( time - this.time ) / this.options.duration );
                 this.options.onCompute( delta );
             } else {
-                this.timer = w.clearInterval( this.timer );
+                this.timer = window.clearInterval( this.timer );
                 this.options.onCompute( 1 );
                 this.options.onComplete();
             }
@@ -755,7 +933,7 @@
 
             this.options.onBegin();
             this.time  = $time() - this.time;
-            this.timer = w.setInterval( ( function() {
+            this.timer = window.setInterval( ( function() {
                 self.step();
             } ), M.round( 1000 / this.options.fps ) );
 
@@ -763,6 +941,224 @@
         }
     } );
 
+
+    // Rotation preprocessor
+
+    var Rot = ( function() {
+        var sin = [];
+        var cos = [];
+
+        for ( var i = -360; i < 360; i++ ) {
+            sin[i] = M.sin( i * DEG_TO_RAD );
+            cos[i] = M.cos( i * DEG_TO_RAD );
+        }
+
+        return {
+            s: function( i ) {return sin[$i( i )] || M.sin( i * DEG_TO_RAD );},
+            c: function( i ) {return cos[$i( i )] || M.cos( i * DEG_TO_RAD );}
+        };
+    } )();
+
+
+    // Vertex class
+
+    $X = function( x, y ) {
+        return new Vertex( x || 0, y || 0 );
+    };
+
+    var Vertex = new Class( {
+        initialize: function( x, y ) {
+            this.x = x;
+            this.y = y;
+        }
+    } );
+
+    $extend( Vertex, {
+        triangulate: function( vertices ) {
+            var i, triangle, triangles = [], st = Vertex.createBoundingTriangle( vertices );
+            triangles.push( st );
+
+            // begin the triangulation one vertex at a time
+            for ( i in vertices ) {
+                Vertex.add( vertices[i], triangles );
+            }
+
+            // remove triangles that shared edges with "supertriangle"
+            for ( i in triangles ) {
+                triangle = triangles[i];
+
+                if ( ( triangle.v0 == st.v0 ) || ( triangle.v0 == st.v1 ) || ( triangle.v0 == st.v2 ) ||
+                     ( triangle.v1 == st.v0 ) || ( triangle.v1 == st.v1 ) || ( triangle.v1 == st.v2 ) ||
+                     ( triangle.v2 == st.v0 ) || ( triangle.v2 == st.v1 ) || ( triangle.v2 == st.v2 ) ) {
+                    delete triangles[i];
+                }
+            }
+
+            return triangles;
+        },
+
+        // create a triangle that bounds the given vertices, with room to spare
+        createBoundingTriangle: function( vertices ) {
+            var minx, miny, maxx, maxy, vertex;
+
+            for ( var i in vertices ) {
+                vertex = vertices[i];
+        
+                if ( ( $t( minx ) == 'undefined' ) || ( vertex.x < minx ) ) { minx = vertex.x; }
+                if ( ( $t( miny ) == 'undefined' ) || ( vertex.y < miny ) ) { miny = vertex.y; }
+                if ( ( $t( maxx ) == 'undefined' ) || ( vertex.x > maxx ) ) { maxx = vertex.x; }
+                if ( ( $t( maxy ) == 'undefined' ) || ( vertex.y > maxy ) ) { maxy = vertex.y; }
+            }
+
+            var dx   = ( maxx - minx ) * 10;
+            var dy   = ( maxy - miny ) * 10;
+            var stv0 = $X( minx - dx,     miny - dy * 3 );
+            var stv1 = $X( minx - dx,     maxy + dy     );
+            var stv2 = $X( maxx + dx * 3, maxy + dy     );
+
+            return $T( stv0, stv1, stv2 );   
+        },
+
+        // update triangulation with a vertex 
+        add: function( vertex, triangles ) {
+            var i, triangle, edge, edges = [];
+    
+            // remove triangles with circumcircles containing the vertex
+            for ( i in triangles ) {
+                triangle = triangles[i];
+
+                if ( triangle.inCircumcircle( vertex ) ) {
+                    edges.push( $E( triangle.v0, triangle.v1 ) );
+                    edges.push( $E( triangle.v1, triangle.v2 ) );
+                    edges.push( $E( triangle.v2, triangle.v0 ) );
+
+                    delete triangles[i];
+                }
+            }
+
+            edges = Edge.unique( edges );
+
+            // create new triangles from the unique edges and new vertex
+            for ( i in edges ) {
+                edge = edges[i];
+                triangles.push( $T( edge.v0, edge.v1, vertex ) );
+            }
+        }
+    } );
+
+
+    // Edge class
+
+    $E = function( v0, v1 ) {
+        return new Edge( v0, v1 );
+    };
+
+    var Edge = new Class( {
+        initialize: function( v0, v1 ) {
+            this.v0 = v0;
+            this.v1 = v1;
+        }
+    } );
+
+    $extend( Edge, {
+        unique: function( edges ) {
+            var edge1, edge2, unique, i, j, u = [];
+
+            for ( i in edges ) {
+                edge1  = edges[i];
+                unique = true;
+
+                for ( j in edges ) {
+                    if ( i != j ) {
+                        edge2 = edges[j];
+
+                        if ( ( ( edge1.v0 == edge2.v0 ) && ( edge1.v1 == edge2.v1 ) ) || ( ( edge1.v0 == edge2.v1 ) && ( edge1.v1 == edge2.v0 ) ) ) {
+                            unique = false;
+                            break;
+                        }
+                    }
+                }
+        
+                if ( unique ) {
+                    u.push( edge1 );
+                }
+            }
+
+            return u;
+        }
+    } );
+
+
+    // Triangle class
+
+    $T = function( v0, v1, v2 ) {
+        return new Triangle( v0, v1, v2 );
+    };
+
+    var Triangle = new Class( {
+        initialize: function( v0, v1, v2 ) {
+            this.v0 = v0;
+            this.v1 = v1;
+            this.v2 = v2;
+
+            ( function() {
+                var a = this.v1.x - this.v0.x;
+                var b = this.v1.y - this.v0.y;
+                var c = this.v2.x - this.v0.x;
+                var d = this.v2.y - this.v0.y;
+                var e = a * ( this.v0.x + this.v1.x ) + b * ( this.v0.y + this.v1.y );
+                var f = c * ( this.v0.x + this.v2.x ) + d * ( this.v0.y + this.v2.y );
+                var g = 2.0 * ( a * ( this.v2.y - this.v1.y ) - b * ( this.v2.x - this.v1.x ) );
+                var dx, dy;
+    
+                // collinear - find extremes and use the midpoint
+                if ( M.abs( g ) < PRECISION ) {
+                    function max3( a, b, c ) {
+                        return ( ( a >= b ) && ( a >= c ) )? a : ( ( b >= a ) && ( b >= c ) )? b : c;
+                    }
+
+                    function min3( a, b, c ) {
+                        return ( ( a <= b ) && ( a <= c ) )? a : ( ( b <= a ) && ( b <= c ) )? b : c;
+                    }
+
+                    var minx = min3( this.v0.x, this.v1.x, this.v2.x );
+                    var miny = min3( this.v0.y, this.v1.y, this.v2.y );
+                    var maxx = max3( this.v0.x, this.v1.x, this.v2.x );
+                    var maxy = max3( this.v0.y, this.v1.y, this.v2.y );
+
+                    this.center = $X( ( minx + maxx ) / 2, ( miny + maxy ) / 2 );
+
+                    dx = this.center.x - minx;
+                    dy = this.center.y - miny;
+                } else {
+                    var cx = ( d * e - b * f ) / g; 
+                    var cy = ( a * f - c * e ) / g;
+
+                    this.center = $X( cx, cy );
+
+                    dx = this.center.x - this.v0.x;
+                    dy = this.center.y - this.v0.y;
+                }
+
+                this.radius_squared = dx * dx + dy * dy;
+                this.radius = M.sqrt( this.radius_squared );
+            }.$bind( this ) )();
+        },
+
+        inCircumcircle: function( v ) {
+            var dx = this.center.x - v.x;
+            var dy = this.center.y - v.y;
+
+            return ( dx * dx + dy * dy <= this.radius_squared );
+        }
+    } );
+
+
+    // Vector class
+
+    $V = function( els ) {
+        return new Vector( els );
+    };
 
     var Vector = new Class( {
         initialize: function( els ) {
@@ -772,6 +1168,10 @@
         setElements: function( els ) {
             this.elms = ( els.elms || els ).slice();
             return this;
+        },
+
+        asCoordinate: function() {
+            return ( this.size == 3 )? $C( this.elms[0], this.elms[1], this.elms[2] ) : false;
         },
 
         at: function( i ) {
@@ -906,13 +1306,13 @@
 
         multiply: function( k ) {
             return this.map( function( x ) {
-                return x * k;
+                return x * ( k || x );
             } );
         },
 
         divide: function( k ) {
             return this.map( function( x ) {
-                return x / k;
+                return x / ( k || x );
             } );
         },
 
@@ -940,11 +1340,10 @@
                 return null;
             }
 
-            var a = this.elms;
             return $V( [
-                ( a[1] * v[2] ) - ( a[2] * v[1] ),
-                ( a[2] * v[0] ) - ( a[0] * v[2] ),
-                ( a[0] * v[1] ) - ( a[1] * v[0] )
+                ( this.elms[1] * v[2] ) - ( this.elms[2] * v[1] ),
+                ( this.elms[2] * v[0] ) - ( this.elms[0] * v[2] ),
+                ( this.elms[0] * v[1] ) - ( this.elms[1] * v[0] )
             ] );
         },
 
@@ -1104,10 +1503,6 @@
           }
     } );
 
-    $V = function( els ) {
-        return new Vector( els );
-    };
-
     $extend( Vector, {
         // unit vectors
         i: $V( [1, 0, 0] ),
@@ -1120,33 +1515,97 @@
     } );
 
 
+    // Coordinate class - basically a leightweight Vector for Coordinate Storage
+
+    $C = function( x, y, z ) {
+        return new Coordinate( x || 0, y || 0, z || 0 );
+    };
+
     var Coordinate = new Class( {
         initialize: function( x, y, z ) {
             this.set( x, y, z );
+        },
+
+        zero: function() {
+            this.set( 0, 0, 0 );
         },
 
         clone: function() {
             return $C( this.x, this.y, this.z );
         },
 
-        add: function( v ) {
-            if ( arguments.length == 3 ) {
-                this.x += arguments[0];
-                this.y += arguments[1];
-                this.z += arguments[2];
-            } else {
-                this.x += v.x;
-                this.y += v.y;
-                this.z += v.z;
-            }
-
-            return this;
+        asVector: function() {
+            return $V( [this.x, this.y, this.z] );
         },
 
         set: function( x, y, z ) {
             this.x = x;
             this.y = y;
             this.z = z;
+
+            return this;
+        },
+
+        copyFrom: function( v ) {
+            this.x = v.x;
+            this.y = v.y;
+            this.z = v.z;
+
+            return this;
+        },
+
+        add: function( v ) {
+            switch ( arguments.length ) {
+                case 1:
+                    var a = arguments[0];
+
+                    if ( a.elms && ( a.size() === 3 ) ) {
+                        this.x += a.elms[0];
+                        this.y += a.elms[1];
+                        this.z += a.elms[2];
+                    } else {
+                        this.x += a.x;
+                        this.y += a.y;
+                        this.z += a.z;
+                    }
+
+                    break;
+
+                case 3:
+                    this.x += arguments[0];
+                    this.y += arguments[1];
+                    this.z += arguments[2];
+
+                    break;
+            }
+
+            return this;
+        },
+
+        sub: function( v ) {
+            switch ( arguments.length ) {
+                case 1:
+                    var a = arguments[0];
+
+                    if ( a.elms && ( a.size() === 3 ) ) {
+                        this.x -= a.elms[0];
+                        this.y -= a.elms[1];
+                        this.z -= a.elms[2];
+                    } else {
+                        this.x -= a.x;
+                        this.y -= a.y;
+                        this.z -= a.z;
+                    }
+
+                    break;
+
+                case 3:
+                    this.x -= arguments[0];
+                    this.y -= arguments[1];
+                    this.z -= arguments[2];
+
+                    break;
+            }
 
             return this;
         },
@@ -1159,11 +1618,16 @@
             return this;
         },
 
+        divide: function( f ) {
+            this.x /= f;
+            this.y /= f;
+            this.z /= f;
+
+            return this;
+        },
+
         normalize: function() {
-            var l = 0;
-            l += this.x * this.x;
-            l += this.y * this.y;
-            l += this.z * this.z;
+            var l = this.x * this.x + this.y * this.y + this.z * this.z;
 
             if ( l > 0.0 ) {
                 l = M.sqrt( l );
@@ -1176,13 +1640,19 @@
             }
 
             return this;
+        },
+
+        toString: function() {
+            return [this.x, this.y, this.z].join( ', ' );
         }
     } );
 
-    $C = function( x, y, z ) {
-        return new Coordinate( x || 0, y || 0, z || 0 );
-    };
 
+    // Matrix class
+
+    $M = function( els ) {
+        return new Matrix( els );
+    };
 
     var Matrix = new Class( {
         initialize: function( els ) {
@@ -1244,7 +1714,7 @@
                 return null;
             }
     
-            var col = [], n = this.elms.length, k = n, i;
+            var col = [], n = this.rows(), k = n, i;
     
             do {
                 i = k - n;
@@ -1505,7 +1975,7 @@
             return $V( els );
         },
 
-        // make the matrix upper (right) triangular by Gaussian elimination
+        // make the matrix right(/upper) triangular by gaussian elimination
         toRightTriangular: function() {
             var m = this.clone(), n = this.rows(), k = n, kp = this.cols(), p, els, i, np, mult;
     
@@ -1605,7 +2075,7 @@
                 m = $M( m ).elms;
             }
     
-            var t = this.clone(), cols = t.cols(), ni = t.rows(), ki = ni, i, nj, kj = m[0].length, j;
+            var t = this.clone(), cols = t.cols(), ni = t.rows(), ki = ni, i, j, nj, kj = m[0].length;
     
             if ( ni != m.length ) {
                 return null;
@@ -1675,10 +2145,6 @@
             return $M( inv_elms );
         }
     } );
-
-    $M = function( els ) {
-        return new Matrix( els );
-    };
 
     $extend( Matrix, {
         zero: function( n, m ) {
@@ -1770,6 +2236,12 @@
         }
     } );
 
+
+    // Line class
+
+    $L = function( anchor, direction ) {
+        return new Line( anchor, direction );
+    };
 
     var Line = new Class( {
         initialize: function( anchor, direction ) {
@@ -2005,10 +2477,6 @@
         }
     } );
 
-    $L = function( anchor, direction ) {
-        return new Line( anchor, direction );
-    };
-
     $extend( Line, {
         // axes
         X: $L( Vector.zero( 3 ), Vector.i ),
@@ -2016,6 +2484,12 @@
         Z: $L( Vector.zero( 3 ), Vector.k )
     } );
 
+
+    // Plane class
+
+    $P = function( anchor, v1, v2 ) {
+        return new Plane( anchor, v1, v2 );
+    };
 
     var Plane = new Class( {
         initialize: function( anchor, v1, v2 ) {
@@ -2252,16 +2726,14 @@
         }
     } );
 
-    $P = function( anchor, v1, v2 ) {
-        return new Plane( anchor, v1, v2 );
-    };
-
     $extend( Plane, {
         XY: $P( Vector.zero( 3 ), Vector.k ),
         YZ: $P( Vector.zero( 3 ), Vector.i ),
         ZX: $P( Vector.zero( 3 ), Vector.j )
     } );
 
+
+    // Scene class
 
     var Scene = new Class( {
         initialize: function( id, z, options ) {
@@ -2274,12 +2746,12 @@
                 height: 500
             }, options || {} );
 
-            id = id || Scene.ID_COUNT++;
+            this.id = id || SCENE_ID_PREFIX + Scene.ID_COUNT++;
 
             // create fallback if canvas is not in place
-            if ( !$( id ) ) {
-                var div = d.createElement( 'div' );
-                div.id  = id;
+            if ( !$( this.id ) ) {
+                var div = _d.createElement( 'div' );
+                div.id  = this.id;
 
                 with ( div.style ) {
                     position = 'relative';
@@ -2288,26 +2760,25 @@
                     height   = this.options.height;
                 }
 
-                $append( div, b );
+                $append( div, _d.getElementsByTagName( 'body' )[0] );
             }
 
-            this.parent = this.scene = $( id );
+            this.parent = this.scene = $( this.id );
 
-            w = this.parent.style.width;
-            h = this.parent.style.height;
+            this.w = this.parent.style.width;
+            this.h = this.parent.style.height;
 
             if ( Client.hasSVG ) {
                 var doc;
                 $append( doc = $c( 'svg', {
-                    viewBox: '0 0 ' + $i( w ) + ' ' + $i( h ),
-                    width:   w,
-                    height:  h
+                    viewBox: '0 0 ' + $i( this.w ) + ' ' + $i( this.h ),
+                    width:   this.w,
+                    height:  this.h
                 } ), this.parent );
 
                 $append( this.scene = $c( 'g' ), doc );
             }
             
-            this.grid          = null;
             this.poly          = [];
             this.poly_rank     = [];
             this.shapes        = [];
@@ -2318,8 +2789,8 @@
             this.zoom_all      = 1.0;
             this.shift_x       = 0.0;
             this.shift_y       = 0.0;
-            this.xm            = $i( w ) / 2;
-            this.ym            = $i( h ) / 2;
+            this.xm            = $i( this.w ) / 2;
+            this.ym            = $i( this.h ) / 2;
             this.distance      = 1000.0;
             this.viewer        = $C( 1000.0, 0.0, 0.0 );
             this.light         = $C( 1.0, 0.0, 0.0 );
@@ -2337,6 +2808,9 @@
             this.cos_fi_cos_th = 1.0;
             this.sin_fi_cos_th = 0.0;
             this.callbacks     = [];
+
+            this.box           = null;
+            this.navigator     = null;
 
             this.create();
         },
@@ -2366,25 +2840,44 @@
             return this;
         },
 
+        getShapes: function() {
+            return this.shapes;
+        },
+
+        setBoundingBox: function( b, options ) {
+            if ( $t( b ) == 'function' ) {
+                this.box = new b( this, options || {} );
+            }
+
+            return this.box;
+        },
+
+        setNavigator: function( n, options ) {
+            if ( $t( n ) == 'function' ) {
+                this.navigator = new n( this, options || {} );
+            }
+
+            return this.navigator;
+        },
+
         changeView: function( th, fi ) {
-            if ( ( this.th + th >= -89.0 ) && ( this.th + th <= 89.0 ) ) {
-                this.th += th;
+            if ( this.box && this.box.restricted) {
+                if ( ( this.th + th >= -89.0 ) && ( this.th + th <= 89.0 ) ) {
+                    this.th += th;
+                }
+            } else {
+                this.th += th % 89.0;
             }
 
             this.fi += fi;
+            while ( this.fi  <   0.0 ) this.fi += 360.0;
+            while ( this.fi >= 360.0 ) this.fi -= 360.0;
 
-            while ( this.fi < 0.0 ) {
-                this.fi += 360.0;
-            }
+            this.sin_th = Rot.s( this.th );
+            this.cos_th = Rot.c( this.th );
+            this.sin_fi = Rot.s( this.fi );
+            this.cos_fi = Rot.c( this.fi );
 
-            while ( this.fi >= 360.0 ) {
-                this.fi -= 360.0;
-            }
-
-            this.sin_th        = M.sin( this.th * PI_DIV_180 );
-            this.cos_th        = M.cos( this.th * PI_DIV_180 );
-            this.sin_fi        = M.sin( this.fi * PI_DIV_180 );
-            this.cos_fi        = M.cos( this.fi * PI_DIV_180 );
             this.cos_fi_sin_th = this.cos_fi * this.sin_th;
             this.sin_fi_sin_th = this.sin_fi * this.sin_th;
             this.cos_fi_cos_th = this.cos_fi * this.cos_th;
@@ -2394,54 +2887,44 @@
             return this;
         },
 
-        getShapes: function() {
-            return this.shapes;
-        },
-
         changeLight: function( th, fi ) {
-            if ( ( this.light_th + th >= -89.0 ) && ( this.light_th + th <= 89.0 ) ) {
-                this.light_th += th;
+            if ( this.box && this.box.restricted ) {
+                if ( ( this.light_th + th >= -89.0 ) && ( this.light_th + th <= 89.0 ) ) {
+                    this.light_th += th;
+                }
+            } else {
+                this.light_th += th % 89.0;
             }
 
-            this.light_th  = $bound( this.light_th, -89.0,  89.0 );
             this.light_fi += fi;
+            while ( this.light_fi  <   0.0 ) this.light_fi += 360.0;
+            while ( this.light_fi >= 360.0 ) this.light_fi -= 360.0;
 
-            while ( this.light_fi < 0.0 ) {
-                this.light_fi += 360.0;
-            }
-
-            while ( this.light_fi >= 360.0 ) {
-                this.light_fi -= 360.0;
-            }
-
-            this.light.set( M.cos( this.light_fi * PI_DIV_180 ) * M.cos( this.light_th * PI_DIV_180 ), -M.sin( this.light_fi * PI_DIV_180 ) * M.cos( this.light_th * PI_DIV_180 ), -M.sin( this.light_th * PI_DIV_180 ) );
+            this.light.set( Rot.c( this.light_fi ) * Rot.c( this.light_th ), -Rot.s( this.light_fi ) * Rot.c( this.light_th ), -Rot.s( this.light_th ) );
             return this;
         },
 
         addPoly: function( o ) {
             var l = this.poly.length;
-            var z = this.zindex + l + 3; // reserve 0-2 for grid
-            var attributes = styles = null;
 
             this.poly[l]      = o;
             this.poly_rank[l] = new Array( l, 0 );
 
-            if ( Client.hasSVG ) {
-                attributes = {
-                    'z-index': z
-                };
-            } else {
-                styles = {
+            var styles = {
+                zIndex: this.zindex + l + 3 // reserve 0-2 for box
+            };
+
+            if ( Client.hasVML ) {
+                styles = $extend( styles, {
                     position: 'absolute',
                     left:     0,
                     top:      0,
                     width:    this.poly_group.style.width,
-                    height:   this.poly_group.style.height,
-                    zIndex:   z
-                };
+                    height:   this.poly_group.style.height
+                } );
             }
 
-            $append( this.shapes[l] = $c( 'path', attributes, styles ), Client.hasSVG? this.scene : this.poly_group );
+            $append( this.shapes[l] = $c( 'path', null, styles ), Client.hasSVG? this.scene : this.poly_group );
             return this;
         },
 
@@ -2484,14 +2967,16 @@
             v     = xmax * xmax + ymax * ymax + zmax * zmax;
             l     = ( v > 0.0 )? M.sqrt( v ) : 19.0;
 
-            this.zoom_all = ( this.xm < this.ym )? 1.6 * this.xm / l : 1.6 * this.ym / l;
+            this.zoom_all = 1.6 * ( ( this.xm < this.ym )? this.xm : this.ym ) / l
             this.distance = 2 * l;
   
             return this.changeView( 0, 0 );
         },
 
         pos: function( v ) {
-            var n = $C( this.sin_fi * ( v.x - this.center.x ) + this.cos_fi * ( v.y - this.center.y ), -this.cos_fi_sin_th * ( v.x - this.center.x ) + this.sin_fi_sin_th * ( v.y - this.center.y ) - this.cos_th * ( v.z - this.center.z ), this.cos_fi_cos_th * ( v.x - this.center.x ) - this.sin_fi_cos_th * ( v.y - this.center.y ) - this.sin_th * ( v.z - this.center.z ) );
+            var n = $C(  this.sin_fi * ( v.x - this.center.x ) + this.cos_fi * ( v.y - this.center.y ), 
+                        -this.cos_fi_sin_th * ( v.x - this.center.x ) + this.sin_fi_sin_th * ( v.y - this.center.y ) - this.cos_th * ( v.z - this.center.z ),
+                         this.cos_fi_cos_th * ( v.x - this.center.x ) - this.sin_fi_cos_th * ( v.y - this.center.y ) - this.sin_th * ( v.z - this.center.z ) );
 
             if ( this.distance > 0.0 ) {
                 n.x *= this.distance / ( this.distance - n.z );
@@ -2532,19 +3017,16 @@
             return this;
         },
 
-        render: function( nosort ) {
-            if ( !nosort ) {
-                this.sort();
-            }
-
+        render: function() {
+            this.sort();
             this.light.normalize();
 
             for ( var i = 0; i < this.poly.length; i++ ) {
                 this.poly[this.poly_rank[i][0]].render( this.shapes[i] );
             }
     
-            if ( this.grid ) {
-                this.grid.render();
+            if ( this.box && ( $t( this.box.render ) == 'function' ) ) {
+                this.box.render();
             }
 
             return this;
@@ -2560,7 +3042,7 @@
                 v.length = 0;
             } );
 
-            this.grid = null;
+            this.box = null;
             return this;
         },
 
@@ -2612,6 +3094,8 @@
     Scene.ID_COUNT = 0;
 
 
+    // Poly class
+
     var Poly = new Class( {
         initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity ) {
             this.parent       = par;
@@ -2648,8 +3132,8 @@
 
         pointSet: function( i, x, y, z ) {
             if ( ( arguments.length == 1 ) && $t( arguments[0] ) == 'array' ) {
-                $each( arguments[0], function( v ) {
-                    this.pointSet( v[0], v[1], v[2], v[3] );
+                $each( arguments[0], function( v, k ) {
+                    this.pointSet( k, v[0], v[1], v[2] );
                 }.$bind( this ) );
             } else {
                 var zm = this.parent.zoom;
@@ -2662,13 +3146,10 @@
         },
 
         zoom: function( f ) {
-            $each( this.phpoint, function( v ) {
-                v.zoom( f );
-            } );
-
-            $each( this.point, function( v ) {
-                v.zoom( f );
-            } );
+            for ( var i = 0; i < this.point.length; i++ ) {
+                this.phpoint[i].zoom( f );
+                this.point[i].zoom( f );
+            }
 
             return this.refresh();
         },
@@ -2676,13 +3157,10 @@
         shift: function( x, y, z ) {
             var zm = this.parent.zoom;
 
-            $each( this.phpoint, function( v ) {
-                v.add( x, y, z );
-            } );
-
-            $each( this.point, function( v ) {
-                v.add( x * zm.x, y * zm.y, z * zm.z );
-            }.$bind( this ) );
+            for ( var i = 0; i < this.point.length; i++ ) {
+                this.phpoint[i].add( x, y, z );
+                this.point[i].add( x * zm.x, y * zm.y, z * zm.z );
+            }
 
             this.center.add( x * zm.x, y * zm.y, z * zm.z );
             return this;
@@ -2713,43 +3191,41 @@
         },
 
         render: function( shape ) {
-            var l  = this.point.length;
-            var pc = this.parent.getColor( this.frontcolor, this.backcolor, this.normal, this.center );
-
             // build path
             var path = [];
-            for ( var i = 0; i < l; i++ ) {
+            for ( var i = 0; i < this.point.length; i++ ) {
                 v = this.parent.pos( this.point[i] );
                 path.push( [v.x, v.y] );
             }
 
             for ( i in this.parent.callbacks ) {
-                $addEvent( shape, i, this.callbacks[i] || $empty );
+                Evt.register( shape, i, this.callbacks[i] || $empty );
             }
+
+            var pc     = this.parent.getColor( this.frontcolor, this.backcolor, this.normal, this.center );
+            var filled = ( ( this.point.length >= 3 ) && ( this.frontcolor != '' ) );
+
+            if ( this.id != '' ) {
+                shape.attr( 'id', this.id );
+            }
+
+            shape.attr( {
+                'd':            Util.pathify( path ),
+                'fill':         filled? pc : 'none',
+                'stroke':       this.strokecolor? this.strokecolor : pc,
+                'stroke-width': $i( this.strokeweight )
+            } );
 
             if ( Client.hasSVG ) {
                 shape.attr( {
-                    'id':           this.id,
-                    'd':            Util.pathify( path ),
-                    'fill':         ( ( l >= 3 ) && ( this.frontcolor != '' ) )? pc : 'none',
-                    'stroke':       this.strokecolor? this.strokecolor : pc,
-                    'stroke-width': $i( this.strokeweight ),
                     'visibility':   this.visibility,
                     'opacity':      this.opacity
                 } );
             } else {
-                var filled = ( ( l >= 3 ) && ( this.frontcolor != '' ) );
-
                 shape.attr( ( this.visibility == 'visible' )? {
-                    'id':           this.id,
-                    'd':            Util.pathify( path ),
-                    'stroke-width': $i( this.strokeweight ),
-                    'stroke':       this.strokecolor? this.strokecolor : pc,
                     'filled':       filled,
-                    'fill':         filled? pc : '',
                     'opacity':      this.opacity
                 } : {
-                    'id':           this.id,
                     'd':            Util.pathify( [[0, 0]] ),
                     'stroke-width': 0,
                     'filled':       false
@@ -2770,6 +3246,8 @@
         }
     } );
 
+    Poly.ID_COUNT = 0;
+
     $Y = function( obj, fn ) {
         var p = new Poly( obj.parent, obj.frontcolor, obj.backcolor, obj.strokecolor, obj.strokeweight, obj.opacity );
         
@@ -2781,298 +3259,8 @@
         return p;
     };
 
-    var Grid = new Class( {
-        initialize: function( par, fillcol, strokecol, fontstyle ) {
-            this.parent       = par;
-            this.min          = $C( 0.0, 0.0, 0.0 );
-            this.max          = $C( 0.0, 0.0, 0.0 );
-            this.scale        = $C( 1, 1, 1 );
-            this.label        = $C( 'X', 'Y', 'Z' );
-            this.delta        = $C();
-            this.fillcolor    = fillcol   || '#ffffff';
-            this.strokecolor  = strokecol || '#000000';
-            this.strokeweight = 1;
-            this.plane        = [];
-            this.line         = [];
-            this.text         = [];
-            this.parent.grid  = this;
 
-            this.fontstyle = $extend( {
-                fontFamily: 'Arial',
-                fontSize:   '12px'
-            }, fontstyle || {} );
-
-            var i, j, style, ref = Client.hasSVG? this.parent.scene : this.parent.box_group;
-
-            for ( i = 0; i < 3; i++ ) {
-                $append( this.plane[i] = $c( 'path', null, Client.hasSVG? {
-                    zIndex:   this.parent.zindex
-                } : {
-                    position: 'absolute',
-                    left:     0,
-                    top:      0,
-                    width:    this.parent.box_group.style.width,
-                    height:   this.parent.box_group.style.height,
-                    zIndex:   this.parent.zindex
-                } ), ref );
-            }
-
-            for ( i = 0; i < 6; i++ ) {
-                this.line[i] = new Array( 11 );
-                this.text[i] = new Array( 11 );
-
-                for ( j = 0; j < 11; j++ ) {
-                    $append( this.line[i][j] = $c( 'line', {'stroke-width': 1}, Client.hasSVG? {
-                        zIndex:        this.parent.zindex + 1
-                    } : {
-                        position:      'absolute',
-                        left:          0,
-                        top:           0,
-                        width:         this.parent.box_group.style.width,
-                        height:        this.parent.box_group.style.height,
-                        zIndex:        this.parent.zindex + 1
-                    } ), ref );
-
-                    style = Client.hasSVG? {
-                        width:         1,
-                        height:        20,
-                        textAnchor:    'middle',
-                        zIndex:        this.parent.zindex + 2
-                    } : {
-                        position:      'absolute',
-                        left:          0,
-                        top:           0,
-                        width:         100,
-                        height:        20,
-                        textAlign:     'center',
-                        zIndex:        this.parent.zindex + 2
-                    }
-
-                    $append( this.text[i][j] = $c( 'text', null, $extend( style, this.fontstyle ) ), ref );
-
-                    if ( Client.hasSVG ) {
-                        $append( d.createTextNode( '' ), this.text[i][j] );
-                    }
-                }
-            }
-        },
-
-        setBorder: function( xmin, ymin, zmin, xmax, ymax, zmax ) {
-            var zm = this.parent.zoom;
-
-            this.min.set( xmin * zm.x, ymin * zm.y, zmin * zm.z );
-            this.max.set( xmax * zm.x, ymax * zm.y, zmax * zm.z );
-
-            return this;
-        },
-
-        render: function() {
-            function scaleStr( j, g ) {
-                return ( M.abs( g ) >= 1 )? j : M.round( 10 * j / g ) / M.round( 10 / g );
-            };
-
-            function gridCalc( min, max, scale ) {
-                var i, j, x, r, d, xr, g = new Array( 3 );
-
-                if ( ( scale <= 1 ) || ( isNaN( scale ) ) ) {
-                    d = max - min;
-                    r = 1;
-
-                    while ( M.abs( d ) >= 100 ) {
-                        d /= 10;
-                        r *= 10;
-                    }
-    
-                    while ( M.abs( d ) < 10 ) {
-                        d *= 10;
-                        r /= 10;
-                    }
- 
-                    d = ( ( M.abs( d ) >= 50 )? 10 * r : ( ( M.abs( d ) >= 20 )? 5 * r : 2 * r ) );
-                } else {
-                    d = Date.$interval( max - min );
-                }
-
-                x    = M.floor( min / d ) * d;
-                i    = 0;
-                g[1] = d;
-
-                for ( j = 12; j >= -1; j-- ) {
-                    xr = x + j * d;
-
-                    if ( ( xr >= min ) && ( xr <= max ) ) {
-                        if ( i == 0 ) {
-                            g[2] = xr;
-                        }
-      
-                        g[0] = xr;
-                        i++;
-                    }
-                }
-
-                return g;
-            };
-
-            // draw planes
-            $each( {
-                z: {
-                    indices:    [0, 0, 1],
-                    viewcond:   ( this.min.x < this.max.x ) && ( this.min.y < this.max.y ),
-                    cond:       ( this.parent.th  <   0 ),
-                    cond2:      ( this.parent.fi >= 180 ),
-                    cond3:      ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
-                    buildorder: ['x', 'y', 'x']
-                },
-                y: {
-                    indices:    [1, 2, 3],
-                    viewcond:   ( this.min.x < this.max.x ) && ( this.min.z < this.max.z ),
-                    cond:       ( this.parent.fi >= 180 ),
-                    cond2:      ( this.parent.th  <   0 ),
-                    cond3:      ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
-                    buildorder: ['x', 'z', 'x']
-                },
-                x: {
-                    indices:    [2, 4, 5],
-                    viewcond:   ( this.min.y < this.max.y ) && ( this.min.z < this.max.z ),
-                    cond:       ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
-                    cond2:      ( this.parent.th  <   0 ),
-                    cond3:      ( this.parent.fi >= 180 ),
-                    buildorder: ['y', 'z', 'y']
-                }
-            }, function( config, plane ) {
-                if ( config.viewcond ) {
-                    var xx, yy, vc, g, p, v, u  = Client.hasSVG? 0 : 1;
-
-                    p = $C( this.min.x, this.min.y, this.min.z );
-                    p[plane] = config.cond? this.min[plane] : this.max[plane];
-
-                    vc = this.parent.pos( p );
-                    path = [[vc.x, vc.y]];
-
-                    $each( [this.max[config.buildorder[0]], this.max[config.buildorder[1]], this.min[config.buildorder[2]]], function( v, k ) {
-                        p[config.buildorder[k]] = v;
-                        vc = this.parent.pos( p );
-                        path.push( [vc.x, vc.y] );  
-                    }.$bind( this ) );
-
-                    p = $C();
-                    p[plane] = 1;
-
-                    this.plane[config.indices[0]].attr( {
-                        'fill':         this.parent.getColor( this.fillcolor, this.fillcolor, p, config.cond? this.min : this.max ),
-                        'stroke':       this.strokecolor,
-                        'stroke-width': $i( this.strokeweight ),
-                        'visibility':   'visible',
-                        'd':            Util.pathify( path )
-                    } );
-
-                    p[plane] = config.cond? this.min[plane] : this.max[plane];
-
-                    for ( var k = 0, itconfig = [ {
-                        dir:   {z: 'x', y: 'x', x: 'y'}[plane],
-                        dir2:  {z: 'y', y: 'z', x: 'z'}[plane],
-                        dir3:  {z: 'x', y: 'x', x: 'y'}[plane],
-                        dir4:  {z: 'z', y: 'y', x: 'y'}[plane],
-                        dir5:  {z: 'x', y: 'x', x: 'y'}[plane],
-                        cond:  config.cond2,
-                        cond2: config.cond3
-                    }, {
-                        dir:   {z: 'y', y: 'z', x: 'z'}[plane],
-                        dir2:  {z: 'x', y: 'x', x: 'y'}[plane],
-                        dir3:  {z: 'y', y: 'z', x: 'z'}[plane],
-                        dir4:  {z: 'z', y: 'y', x: 'x'}[plane],
-                        dir5:  {z: 'y', y: 'z', x: 'z'}[plane],
-                        cond:  config.cond3,
-                        cond2: config.cond2
-                    } ]; k < itconfig.length; k++ ) {
-                        v = itconfig[k].dir;
-                        g = gridCalc( this.min[v] / this.parent.zoom[v], this.max[v] / this.parent.zoom[v], this.scale[v] );
-
-                        if ( this.delta[v] != 0 ) {
-                            g[1] = this.delta[v];
-                        }
-
-                        var i = 0;
-                        for ( var j = g[2]; j >= g[0]; j -= g[1] ) {
-                            $each( ['x', 'y', 'z'].$without( plane ), function( v, key ) {
-                                p[v] = ( key? ( k? j * this.parent.zoom[v] : this.min[v] ) : ( k? this.min[v] : j * this.parent.zoom[v] ) );
-                            }.$bind( this ) );
-
-                            vc = this.parent.pos( p );
-                            this.line[config.indices[k + 1]][i].attr( 'from', $i( vc.x ) + ',' + $i( vc.y ) );
-
-                            xx   = vc.x;
-                            yy   = vc.y;
-                            v    = itconfig[k].dir2;
-                            p[v] = this.max[v];
-                            vc   = this.parent.pos( p );
-
-                            this.line[config.indices[k + 1]][i].attr( {
-                                to:         $i( vc.x ) + ',' + $i( vc.y ),
-                                stroke:     this.strokecolor,
-                                visibility: 'visible'
-                            } );
-
-                            this.text[config.indices[k + 1]][i].attr( $extend( { color: this.strokecolor, visibility: 'visible' }, ( itconfig[k].cond? {
-                                x: M.floor( xx + ( vc.x - xx )   * 1.06 ) - 50 * u,
-                                y: M.floor( yy + ( vc.y - yy )   * 1.06 ) -  7 * u
-                            } : {
-                                x: M.floor( vc.x + ( xx - vc.x ) * 1.06 ) - 50 * u,
-                                y: M.floor( vc.y + ( yy - vc.y ) * 1.06 ) -  7 * u
-                            } ) ) );
-
-                            v = itconfig[k].dir3;
-
-                            if ( ( i == 1 ) && ( this.label[v] ) ) {
-                                this.text[config.indices[k + 1]][i].attr( 'innerText', this.label[v] );
-                            } else {
-                                if ( isNaN( this.scale[v] ) ) {
-                                    this.text[config.indices[k + 1]][i].attr( 'innerText', ( $t( this.scale[v] ) == 'function' )? this.scale[v]( scaleStr( j, g[1] ) ) : scaleStr( j, g[1] ) + this.scale[v] );
-                                } else {
-                                    this.text[config.indices[k + 1]][i].attr( 'innerText', ( this.scale[v] == 1 )? scaleStr( j, g[1] ) : ( ( this.scale[v] > 1 )? Date.$format( j, g[1], this.scale[v] ) : '' ) );
-                                }
-                            }
-
-                            i++;
-                        }
-
-                        v = itconfig[k].dir4;
-
-                        if ( this.min[v] < this.max[v] ) {
-                            v = itconfig[k].dir5;
-
-                            if ( itconfig[k].cond2 ) {
-                                if ( this.min[v] / this.parent.zoom[v] > g[0] - g[1] / 3 ) {
-                                    this.text[config.indices[k + 1]][i - 1].attr( 'innerText', '' );
-                                }
-                            } else {
-                                if ( this.max[v] / this.parent.zoom[v] < g[2] + g[1] / 3 ) {
-                                    this.text[config.indices[k + 1]][i].attr( 'innerText', '' );
-                                }
-                            }
-                        }
-
-                        while ( i < 11 ) {
-                            this.line[config.indices[k + 1]][i].attr( 'visibility', 'hidden' );
-                            this.text[config.indices[k + 1]][i].attr( 'visibility', 'hidden' );  
-      
-                            i++;
-                        }
-                    }
-                } else {
-                    this.plane[config.indices[0]].attr( 'visibility', 'hidden' );
-
-                    for ( i = 0; i < 11; i++ ) {
-                        this.line[config.indices[1]][i].attr( 'visibility', 'hidden' );
-                        this.line[config.indices[2]][i].attr( 'visibility', 'hidden' );
-                    }
-                }
-            }.$bind( this ) );
-
-            return this;
-        }
-    } );
-
+    // BaseObject class
 
     var $B = BaseObject = new Class( {
         initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, center ) {
@@ -3084,12 +3272,15 @@
             this.opacity      = opacity      || 100;
             this.center       = center       || $C();
             this.poly3d       = [];
+            this.uservalue    = null;
+            this.hasevents    = false;
 
-            // rotate functions
             var self = this;
+
+            // build rotate functions
             function r( fi, c, ax ) {
-                var fi_cos = M.cos( fi * PI_DIV_180 );
-                var fi_sin = M.sin( fi * PI_DIV_180 );
+                var fi_cos = Rot.c( fi );
+                var fi_sin = Rot.s( fi );
 
                 $each( self.poly3d, function( v ) {
                     var ax1, ax2;
@@ -3115,20 +3306,38 @@
             } );
         },
 
-        setID: function( id ) {
-            this.poly3d.$apply( 'id', id );
+        setUserValue: function( val ) {
+            this.uservalue = val;
             return this;
         },
 
+        getUserValue: function() {
+            return this.uservalue;
+        },
+
         bindEvent: function( name, fn ) {
-            if ( fn ) {
-                this.parent.callbacks[name] = fn;
+            if ( $t( fn ) != 'function' ) {
+                return;
             }
 
             $each( this.poly3d, function( v ) {
                 v.callbacks[name] = fn;
             } );
 
+            if ( !this.hasevents ) {
+                // only faciliate reference handling upon request
+                $each( this.poly3d, function( v ) {
+                    var id = this.parent.id + '-' + POLY_ID_PREFIX + Poly.ID_COUNT++;
+
+                    v.id           = id;
+                    OBJECT_REF[id] = this;
+                    POLY_REF[id]   = v;
+                }.$bind( this ) );
+
+                this.hasevents = true;
+            }
+
+            this.parent.callbacks[name] = fn;
             return this;
         },
 
@@ -3171,7 +3380,7 @@
         },
 
         setOpacity: function( o ) {
-            this.poly3d.$apply( 'opacity', w );
+            this.poly3d.$apply( 'opacity', o );
             return this;
         },
 
@@ -3184,6 +3393,8 @@
         }
     } );
 
+
+    // CoordPlane class
 
     var CoordPlane = new Class( {
         $extends: $B,
@@ -3212,9 +3423,488 @@
     } );
 
 
-    var navigators = {
-    };
+    // predefined navigators
 
+    var navigators = ( function() {
+        var picture_zoomed = 0;
+        var viewer_zoomed  = 0;
+
+        function shiftScene( scene, x, y ) {
+            scene.xm += x;
+            scene.ym += y;
+
+            return scene.render();
+        };
+
+        function zoomScene( scene, v, f ) {
+            if ( ( picture_zoomed + v > 5 ) || ( picture_zoomed + v < -5 ) ) {
+                return scene;
+            }
+  
+            picture_zoomed += v;
+  
+            if ( v > 0 ) {
+                scene.zoom_all *= f;
+            } else {
+                scene.zoom_all /= f;
+            }
+
+            return scene.render();
+        };
+
+        function zoomViewer( scene, v, f ) {
+            if ( ( viewer_zoomed + v > 5 ) || ( viewer_zoomed + v < -5 ) ) {
+                return scene;
+            }
+  
+            viewer_zoomed += v;
+  
+            if ( v > 0 ) {
+                scene.distance *= f;
+            } else {
+                scene.distance /= f;
+            }
+
+            return scene.render();
+        };
+
+        return {
+            KeyboardRotator: new Class( {
+                initialize: function( par, options ) {
+                    this.options = $extend( {
+                        rotate_y:           5,
+                        rotate_x:           10,
+                        shift_x:            20,
+                        shift_y:            20,
+                        light_x:            10,
+                        light_y:            10,
+                        zoom_scene_factor:  1.1,
+                        zoom_viewer_factor: 0.8
+                    }, options || {} );
+
+                    this.scene = par;
+                    this.div   = par.parent;
+
+                    Evt.enableKeyboard( function( evt ) {
+                        var k, ctrl = false;
+
+                        if ( evt ) {
+                            k    = evt.which || evt.charCode || evt.keyCode;
+                            ctrl = ( evt.ctrlKey || evt.metaKey || evt.altKey || evt.modifiers );
+                        } else if ( window.event ) {
+                            k    = window.event.keyCode;
+                            ctrl = ( window.event.ctrlKey || window.event.metaKey || window.event.altKey );
+                        } else {
+                            return true;
+                        }
+
+                        if ( window.event ) {
+                            evt = window.event;
+                        }
+
+                        /*
+                        // map specials
+                        if ( k == '' ) {                            
+                            if ( ( evt.charCode == 0 ) && evt.keyCode ) {
+                                if ( evt.keyCode == 37 ) {
+                                    k = 28;
+                                } else if ( evt.keyCode == 39 ) {
+                                    k = 29;
+                                } else if ( evt.keyCode == 38 ) {
+                                    k = 30;
+                                } else if ( evt.keyCode == 40 ) {
+                                    k = 31;
+                                }
+                            }
+                        }
+                        */
+
+                        var ch          = ( ( ( k >= 32 ) && ( k < 127 ) )? String.fromCharCode( k ) : '' ).toLowerCase();
+                        var chars_up    = ['2', 'w', 'i'], keys_up    = [30, 38];
+                        var chars_left  = ['4', 'a', 'j'], keys_left  = [28, 37];
+                        var chars_right = ['6', 'd', 'l'], keys_right = [29, 39];
+                        var chars_down  = ['8', 's', 'k'], keys_down  = [31, 40];
+
+                        if ( ctrl ) {
+                            // CTRL: shift
+                            if ( evt.ctrlKey ) {
+                                if ( chars_up.$in( ch ) || keys_up.$in( k ) ) {
+                                    shiftScene( this.scene, 0, -this.options.shift_y );
+                                } else if ( chars_left.$in( ch ) || keys_left.$in( k ) ) {
+                                    shiftScene( this.scene, -this.options.shift_x, 0 );
+                                } else if ( chars_right.$in( ch ) || keys_right.$in( k ) ) {
+                                    shiftScene( this.scene,  this.options.shift_x, 0 );
+                                } else if ( chars_down.$in( ch ) || keys_down.$in( k ) ) {
+                                    shiftScene( this.scene, 0,  this.options.shift_y );
+                                }
+                            }
+                            // ALT: light
+                            else if ( evt.altKey ) {
+                                if ( chars_up.$in( ch ) || keys_up.$in( k ) ) {
+                                    this.scene.changeLight( -this.options.light_y, 0 ).render();
+                                } else if ( chars_left.$in( ch ) || keys_left.$in( k ) ) {
+                                    this.scene.changeLight( 0,  this.options.light_x ).render();
+                                } else if ( chars_right.$in( ch ) || keys_right.$in( k ) ) {
+                                    this.scene.changeLight( 0, -this.options.light_x ).render();
+                                } else if ( chars_down.$in( ch ) || keys_down.$in( k ) ) {
+                                    this.scene.changeLight(  this.options.light_y, 0 ).render();
+                                }
+                            }
+                            // CMD: zoom scene/viewer
+                            else if ( evt.metaKey ) {
+                                if ( chars_up.$in( ch ) || keys_up.$in( k ) ) {
+                                    zoomScene( this.scene, 1, this.options.zoom_scene_factor );
+                                } else if ( chars_left.$in( ch ) || keys_left.$in( k ) ) {
+                                    zoomViewer( this.scene, -1, this.options.zoom_viewer_factor );
+                                } else if ( chars_right.$in( ch ) || keys_right.$in( k ) ) {
+                                    zoomViewer( this.scene, 1, this.options.zoom_viewer_factor );
+                                } else if ( chars_down.$in( ch ) || keys_down.$in( k ) ) {
+                                    zoomScene( this.scene, -1, this.options.zoom_scene_factor );
+                                }
+                            }
+                        } else {
+                            if ( chars_up.$in( ch ) || keys_up.$in( k ) ) {
+                                this.scene.changeView(  this.options.rotate_y, 0 ).render();
+                            } else if ( chars_left.$in( ch ) || keys_left.$in( k ) ) {
+                                this.scene.changeView( 0,  this.options.rotate_x ).render();
+                            } else if ( chars_right.$in( ch ) || keys_right.$in( k ) ) {
+                                this.scene.changeView( 0, -this.options.rotate_x ).render();
+                            } else if ( chars_down.$in( ch ) || keys_down.$in( k ) ) {
+                                this.scene.changeView( -this.options.rotate_y, 0 ).render();
+                            }
+                        }
+    
+                        Evt.stop( evt );
+                        return false;
+                    }.$bind( this ) );
+                }
+            } ),
+
+            /* EXPERIMENTAL */
+            MouseRotator: new Class( {
+                initialize: function( par, options ) {
+                    this.options = $extend( {
+                        rotate_y: 5,
+                        rotate_x: 10
+                    }, options || {} );
+
+                    this.scene = par;
+                    this.div   = par.parent;
+
+                    Evt.register( this.div, 'mouseover', function( evt ) {
+                        var p = Evt.pos( evt, this.scene );
+
+                        this.scene.changeView(
+                            ( p.y < this.scene.ym )? this.options.rotate_y : -this.options.rotate_y,
+                            ( p.x < this.scene.xm )? this.options.rotate_x : -this.options.rotate_x
+                        ).render();
+                    }.$bind( this ) );
+                }
+            } )
+        };
+    } )();
+
+
+    // predefined boundingboxes
+
+    var boundingboxes = ( function() {
+        function scaleStr( j, g ) {
+            return ( M.abs( g ) >= 1 )? j : M.round( 10 * j / g ) / M.round( 10 / g );
+        };
+
+        function gridCalc( min, max, scale ) {
+            var i, j, x, r, d, xr, g = new Array( 3 );
+
+            if ( ( scale <= 1 ) || ( $n( scale ) ) ) {
+                d = max - min;
+                r = 1;
+
+                while ( M.abs( d ) >= 100 ) {d /= 10; r *= 10;}
+                while ( M.abs( d )  <  10 ) {d *= 10; r /= 10;}
+ 
+                d = ( ( M.abs( d ) >= 50 )? 10 * r : ( ( M.abs( d ) >= 20 )? 5 * r : 2 * r ) );
+            } else {
+                d = Date.$interval( max - min );
+            }
+
+            x    = M.floor( min / d ) * d;
+            i    = 0;
+            g[1] = d;
+
+            for ( j = 12; j >= -1; j-- ) {
+                xr = x + j * d;
+
+                if ( ( xr >= min ) && ( xr <= max ) ) {
+                    if ( i == 0 ) {
+                        g[2] = xr;
+                    }
+      
+                    g[0] = xr;
+                    i++;
+                }
+            }
+
+            return g;
+        };
+
+        return {
+            Grid: new Class( {
+                initialize: function( par, options ) {
+                    this.options = $extend( {
+                        max_cols:     12,
+                        /*
+                        max_rows:     3,
+                        */
+                        fillcol:      '#ffffff',
+                        strokecol:    '#000000',
+                        strokeweight: 1,
+                        fontstyle:    {
+                            fontFamily: 'Arial',
+                            fontSize:   '12px'
+                        }
+                    }, options || {} );
+
+                    this.parent       = par;
+                    this.min          = $C( 0.0, 0.0, 0.0 );
+                    this.max          = $C( 0.0, 0.0, 0.0 );
+                    this.scale        = $C( 1, 1, 1 );
+                    this.label        = $C( 'X', 'Y', 'Z' );
+                    this.delta        = $C();
+                    this.plane        = [];
+                    this.line         = [];
+                    this.text         = [];
+                    this.restricted   = true;
+
+                    var i, j, style, ref = Client.hasSVG? this.parent.scene : this.parent.box_group;
+
+                    for ( i = 0; i < 3; i++ ) {
+                        $append( this.plane[i] = $c( 'path', null, Client.hasSVG? {
+                            zIndex:   this.parent.zindex
+                        } : {
+                            position: 'absolute',
+                            left:     0,
+                            top:      0,
+                            width:    this.parent.box_group.style.width,
+                            height:   this.parent.box_group.style.height,
+                            zIndex:   this.parent.zindex
+                        } ), ref );
+                    }
+
+                    for ( i = 0; i < 6; i++ ) {
+                        this.line[i] = new Array( this.options.max_cols - 1 );
+                        this.text[i] = new Array( this.options.max_cols - 1 );
+
+                        for ( j = 0; j < this.options.max_cols - 1; j++ ) {
+                            $append( this.line[i][j] = $c( 'line', {
+                                'stroke-width': this.options.strokeweight
+                            }, Client.hasSVG? {
+                                zIndex:         this.parent.zindex + 1
+                            } : {
+                                position:       'absolute',
+                                left:           0,
+                                top:            0,
+                                width:          this.parent.box_group.style.width,
+                                height:         this.parent.box_group.style.height,
+                                zIndex:         this.parent.zindex + 1
+                            } ), ref );
+
+                            style = Client.hasSVG? {
+                                width:          1,
+                                height:         20,
+                                textAnchor:     'middle',
+                                zIndex:         this.parent.zindex + 2
+                            } : {
+                                position:       'absolute',
+                                left:           0,
+                                top:            0,
+                                width:          100,
+                                height:         20,
+                                textAlign:      'center',
+                                zIndex:         this.parent.zindex + 2
+                            };
+
+                            $append( this.text[i][j] = $c( 'text', null, $extend( style, this.options.fontstyle ) ), ref );
+
+                            if ( Client.hasSVG ) {
+                                $append( _d.createTextNode( '' ), this.text[i][j] );
+                            }
+                        }
+                    }
+                },
+
+                setBorder: function( xmin, ymin, zmin, xmax, ymax, zmax ) {
+                    var zm = this.parent.zoom;
+
+                    this.min.set( xmin * zm.x, ymin * zm.y, zmin * zm.z );
+                    this.max.set( xmax * zm.x, ymax * zm.y, zmax * zm.z );
+
+                    return this;
+                },
+
+                render: function() {
+                    $each( {
+                        z: {
+                            indices:    [0, 0, 1],
+                            viewcond:   ( this.min.x < this.max.x ) && ( this.min.y < this.max.y ),
+                            cond:       ( this.parent.th  <   0 ),
+                            cond2:      ( this.parent.fi >= 180 ),
+                            cond3:      ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
+                            buildorder: ['x', 'y', 'x']
+                        },
+                        y: {
+                            indices:    [1, 2, 3],
+                            viewcond:   ( this.min.x < this.max.x ) && ( this.min.z < this.max.z ),
+                            cond:       ( this.parent.fi >= 180 ),
+                            cond2:      ( this.parent.th  <   0 ),
+                            cond3:      ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
+                            buildorder: ['x', 'z', 'x']
+                        },
+                        x: {
+                            indices:    [2, 4, 5],
+                            viewcond:   ( this.min.y < this.max.y ) && ( this.min.z < this.max.z ),
+                            cond:       ( this.parent.fi  <  90 ) || ( this.parent.fi >= 270 ),
+                            cond2:      ( this.parent.th  <   0 ),
+                            cond3:      ( this.parent.fi >= 180 ),
+                            buildorder: ['y', 'z', 'y']
+                        }
+                    }, function( config, plane ) {
+                        if ( config.viewcond ) {
+                            var xx, yy, vc, g, p, v, u  = Client.hasSVG? 0 : 1;
+
+                            p = $C( this.min.x, this.min.y, this.min.z );
+                            p[plane] = config.cond? this.min[plane] : this.max[plane];
+
+                            vc = this.parent.pos( p );
+                            path = [[vc.x, vc.y]];
+
+                            $each( [this.max[config.buildorder[0]], this.max[config.buildorder[1]], this.min[config.buildorder[2]]], function( v, k ) {
+                                p[config.buildorder[k]] = v;
+                                vc = this.parent.pos( p );
+                                path.push( [vc.x, vc.y] );  
+                            }.$bind( this ) );
+
+                            p = $C();
+                            p[plane] = 1;
+
+                            this.plane[config.indices[0]].attr( {
+                                'fill':         this.parent.getColor( this.options.fillcolor, this.options.fillcolor, p, config.cond? this.min : this.max ),
+                                'stroke':       this.options.strokecolor,
+                                'stroke-width': $i( this.options.strokeweight ),
+                                'visibility':   'visible',
+                                'd':            Util.pathify( path )
+                            } );
+
+                            p[plane] = config.cond? this.min[plane] : this.max[plane];
+
+                            for ( var k = 0, itconfig = [ {
+                                dir:   {z: 'x', y: 'x', x: 'y'}[plane],
+                                dir2:  {z: 'y', y: 'z', x: 'z'}[plane],
+                                dir3:  {z: 'x', y: 'x', x: 'y'}[plane],
+                                dir4:  {z: 'z', y: 'y', x: 'y'}[plane],
+                                dir5:  {z: 'x', y: 'x', x: 'y'}[plane],
+                                cond:  config.cond2,
+                                cond2: config.cond3
+                            }, {
+                                dir:   {z: 'y', y: 'z', x: 'z'}[plane],
+                                dir2:  {z: 'x', y: 'x', x: 'y'}[plane],
+                                dir3:  {z: 'y', y: 'z', x: 'z'}[plane],
+                                dir4:  {z: 'z', y: 'y', x: 'x'}[plane],
+                                dir5:  {z: 'y', y: 'z', x: 'z'}[plane],
+                                cond:  config.cond3,
+                                cond2: config.cond2
+                            } ]; k < itconfig.length; k++ ) {
+                                v = itconfig[k].dir;
+                                g = gridCalc( this.min[v] / this.parent.zoom[v], this.max[v] / this.parent.zoom[v], this.scale[v] );
+
+                                if ( this.delta[v] != 0 ) {
+                                    g[1] = this.delta[v];
+                                }
+
+                                var i = 0;
+                                for ( var j = g[2]; j >= g[0]; j -= g[1] ) {
+                                    $each( ['x', 'y', 'z'].$without( plane ), function( v, key ) {
+                                        p[v] = ( key? ( k? j * this.parent.zoom[v] : this.min[v] ) : ( k? this.min[v] : j * this.parent.zoom[v] ) );
+                                    }.$bind( this ) );
+
+                                    vc = this.parent.pos( p );
+                                    this.line[config.indices[k + 1]][i].attr( 'from', $i( vc.x ) + ',' + $i( vc.y ) );
+
+                                    xx   = vc.x;
+                                    yy   = vc.y;
+                                    v    = itconfig[k].dir2;
+                                    p[v] = this.max[v];
+                                    vc   = this.parent.pos( p );
+
+                                    this.line[config.indices[k + 1]][i].attr( {
+                                        to:         $i( vc.x ) + ',' + $i( vc.y ),
+                                        stroke:     this.options.strokecolor,
+                                        visibility: 'visible'
+                                    } );
+
+                                    this.text[config.indices[k + 1]][i].attr( $extend( { color: this.options.strokecolor, visibility: 'visible' }, ( itconfig[k].cond? {
+                                        x: M.floor( xx + ( vc.x - xx )   * 1.06 ) - 50 * u,
+                                        y: M.floor( yy + ( vc.y - yy )   * 1.06 ) -  7 * u
+                                    } : {
+                                        x: M.floor( vc.x + ( xx - vc.x ) * 1.06 ) - 50 * u,
+                                        y: M.floor( vc.y + ( yy - vc.y ) * 1.06 ) -  7 * u
+                                    } ) ) );
+
+                                    v = itconfig[k].dir3;
+
+                                    if ( ( i == 1 ) && ( this.label[v] ) ) {
+                                        this.text[config.indices[k + 1]][i].attr( 'innerText', this.label[v] );
+                                    } else {
+                                        if ( $n( this.scale[v] ) ) {
+                                            this.text[config.indices[k + 1]][i].attr( 'innerText', ( $t( this.scale[v] ) == 'function' )? this.scale[v]( scaleStr( j, g[1] ) ) : scaleStr( j, g[1] ) + this.scale[v] );
+                                        } else {
+                                            this.text[config.indices[k + 1]][i].attr( 'innerText', ( this.scale[v] == 1 )? scaleStr( j, g[1] ) : ( ( this.scale[v] > 1 )? Date.$format( j, g[1], this.scale[v] ) : '' ) );
+                                        }
+                                    }
+
+                                    i++;
+                                }
+
+                                v = itconfig[k].dir4;
+
+                                if ( this.min[v] < this.max[v] ) {
+                                    v = itconfig[k].dir5;
+        
+                                    if ( itconfig[k].cond2 ) {
+                                        if ( this.min[v] / this.parent.zoom[v] > g[0] - g[1] / 3 ) {
+                                            this.text[config.indices[k + 1]][i - 1].attr( 'innerText', '' );
+                                        }
+                                    } else {
+                                        if ( this.max[v] / this.parent.zoom[v] < g[2] + g[1] / 3 ) {
+                                            this.text[config.indices[k + 1]][i].attr( 'innerText', '' );
+                                        }
+                                    }
+                                }
+
+                                while ( i < this.options.max_cols - 1 ) {
+                                    this.line[config.indices[k + 1]][i].attr( 'visibility', 'hidden' );
+                                    this.text[config.indices[k + 1]][i].attr( 'visibility', 'hidden' );  
+              
+                                    i++;
+                                }
+                            }
+                        } else {
+                            this.plane[config.indices[0]].attr( 'visibility', 'hidden' );
+
+                            for ( i = 0; i < this.options.max_cols - 1; i++ ) {
+                                this.line[config.indices[1]][i].attr( 'visibility', 'hidden' );
+                                this.line[config.indices[2]][i].attr( 'visibility', 'hidden' );
+                            }
+                        }
+                    }.$bind( this ) );
+
+                    return this;
+                }
+            } )
+        };
+    } )();
+
+
+    // predefined objects
 
     var objects = ( function() {
         function setBoxPlane( p, key, x0, y0, z0, x1, y1, z1 ) {
@@ -3240,9 +3930,102 @@
             };
         };
 
+        function binomCoefficient( n, k ) {
+            if ( k  > n ) return 0;
+            if ( k == 0 ) return 1;
 
-        // predefined objects, sorted alphabetically
+            var res;
+
+            if ( 2 * k > n ) {
+                res = binomCoefficient( n, n - k );
+            } else {
+                res = n;
+
+                for ( var i = 2; i <= k; ++i ) {
+                    res *= n + 1 - i;
+                    res /= i;
+                }
+            }
+
+            return res;
+        };
+
+        function bernstein( i, n, t ) {
+            return binomCoefficient( n, i ) * M.pow( t, i ) * M.pow( 1 - t, n - i );
+        };
+
+        function createPie( obj, detail, outside, start, end ) {
+            detail  = detail  || 5;
+            outside = outside || 5;
+            start   = Util.degToRad( start );
+            end     = Util.degToRad( end   );
+
+            var step    = ( end - start ) / detail;
+            var top_cnt = [0, 0,  .5];
+            var btm_ctn = [0, 0, -.5];
+            var x       = M.cos( start ) * outside;
+            var y       = M.sin( start ) * outside;
+            var top     = [x, y,  .5];
+            var btm     = [x, y, -.5];
+        
+            obj.poly3d.push( $Y( obj, function( p ) {p.pointAdd( [top, top_cnt, btm_ctn, btm] );} ) );
+
+            for ( var i = 1; i <= detail; i++ ) {
+                x       = M.cos( start + i * step ) * outside;
+                y       = M.sin( start + i * step ) * outside;
+                top_new = [x, y,  .5];
+                btm_new = [x, y, -.5];
+
+                obj.poly3d.push( $Y( obj, function( p ) {p.pointAdd( [top_cnt, top, top_new] );} ) );
+                obj.poly3d.push( $Y( obj, function( p ) {p.pointAdd( [btm_ctn, btm, btm_new] );} ) );
+                obj.poly3d.push( $Y( obj, function( p ) {p.pointAdd( [top, top_new, btm_new, btm] );} ) );
+
+                top = top_new;
+                btm = btm_new;
+            }
+        
+            obj.poly3d.push( $Y( obj, function( p ) {p.pointAdd( [top, top_cnt, btm_ctn, btm] );} ) );
+        };
+
         return {
+            Bezier: new Class( {
+                $extends: $B,
+
+                initialize: function( par, strokecol, strokeweight, points, detail ) {
+                    this.$super( par, '', '', strokecol, strokeweight );
+
+                    if ( $t( points ) != 'array' ) {
+                        return;
+                    }
+
+                    detail = detail || 10;
+
+                    var tmp = [];
+                    var n   = points.length - 1;
+                    var m   = points[0].length - 1;
+                    var u, i, j, f, point;
+        
+                    for ( u = 0; u <= detail; ++u ) {
+                        for ( v = 0; v <= detail; ++v ) {
+                            point = $C();
+
+                            for ( i = 0; i <= n; ++i ) {
+                                for ( j = 0; j <= m; ++j ) {
+                                    f = bernstein( i, n, u / detail ) * bernstein( j, m, v / detail );
+                                    point.add( points[i][j][0] * f, points[i][j][1] * f, points[i][j][2] * f );
+                                }
+                            }
+
+                            tmp.push( [point.x, point.y, point.z] );
+                        }
+                    }
+
+                    this.poly3d.push( $Y( this, function( p ) {
+                        p.pointAdd( tmp );
+                    } ) );
+                }
+            } ),
+
             Box: new Class( {
                 $extends: $B,
 
@@ -3282,7 +4065,6 @@
                     this.z1col = z1col;
                 
                     var i = 0;
-
                     $each( [this.z0col, this.z1col, this.y0col, this.y1col, this.x0col, this.x1col], function( val, key ) {
                         if ( val != '#000000' ) {
                             this.poly3d[i] = $Y( $extend( this, {
@@ -3308,7 +4090,6 @@
 
                 setPos: function( x0, y0, z0, x1, y1, z1 ) {
                     var i = 0;
-
                     $each( [this.z0col, this.z1col, this.y0col, this.y1col, this.x0col, this.x1col], function( v, k ) {
                         if ( v != '#000000' ) {
                             setBoxPlane( this.poly3d[i], k, x0, y0, z0, x1, y1, z1 );
@@ -3317,6 +4098,35 @@
                     }.$bind( this ) );
 
                     return this;
+                }
+            } ),
+
+            Cone: new Class( {
+                $extends: $B,
+
+                initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, detail ) {
+                    this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
+
+                    detail = detail || 7;
+
+                    var top    = [0, 1, 0];
+                    var bottom = [0, 0, 0];
+                    var last   = [1, 0, 0];
+                    var points = [last];
+                    var actual;
+
+                    for ( var i = 0; i < detail; i++ ) {
+                        actual = [M.cos( Util.degToRad( 360 * i / detail ) ), 0, M.sin( Util.degToRad( 360 * i / detail ) )];
+                        points.push( actual );
+            
+                        this.poly3d.push( $Y( this, function( p ) {p.pointAdd( [top,    last, actual] );} ) );
+                        this.poly3d.push( $Y( this, function( p ) {p.pointAdd( [bottom, last, actual] );} ) );
+
+                        last = actual;
+                    }
+
+                    this.poly3d.push( $Y( this, function( p ) {p.pointAdd( [top,    last, points[0]] );} ) );
+                    this.poly3d.push( $Y( this, function( p ) {p.pointAdd( [bottom, last, points[0]] );} ) );
                 }
             } ),
 
@@ -3339,14 +4149,27 @@
                 }
             } ),
 
+            Cylinder: new Class( {
+                $extends: $B,
+
+                initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, detail, outside ) {
+                    this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
+
+                    detail  = detail  || 15;
+                    outside = outside || 1;
+
+                    createPie( this, detail, outside, 0, 360 );
+                }
+            } ),
+
             Dodecahedron: new Class( {
                 $extends: $B,
 
                 initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, a, b, c ) {
                     this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
 
-                    a = a || 1.0 / ( 1.0 + M.sqrt( 5.0 ) );
-                    b = b || ( 1.0 + M.sqrt( 5.0 ) ) / 4.0;
+                    a = a || 1.0 / ( 1.0 + SQRT_5 );
+                    b = b || ( 1.0 + SQRT_5 ) / 4.0;
                     c = c || 0.5;
 
                     this.poly3d = [
@@ -3373,7 +4196,7 @@
                     this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
 
                     a = a || 0.5;
-                    b = b || 1.0 / ( 1.0 + M.sqrt( 5.0 ) );
+                    b = b || 1.0 / ( 1.0 + SQRT_5 );
 
                     this.poly3d = [
                         $Y( this, function( p ) {p.pointAdd( [[ 0,  b, -a], [ b,  a,  0], [-b,  a,  0]] );} ),
@@ -3418,7 +4241,7 @@
                 initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, a, b ) {
                     this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
 
-                    a = a || M.sqrt( 0.125 );
+                    a = a || SQRT_EIGHTH;
                     b = b || 0.5;
 
                     this.poly3d = [
@@ -3434,33 +4257,106 @@
                 }
             } ),
 
+            Pie: new Class( {
+                $extends: $B,
+
+                initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, detail, outside, start, end ) {
+                    this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
+
+                    detail  = detail  || 5;
+                    outside = outside || 5;
+                    start   = start   || 0;
+                    end     = end     || 45;
+
+                    createPie( this, detail, outside, start, end );
+                }
+            } ),
+
             Pyramid: new Class( {
                 $extends: $B,
 
                 initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, a, b ) {
                     this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
 
-                    a = a || M.sqrt( 0.125 );
-                    b = b || 0.5;
+                    a = a || SQRT_EIGHTH;
+                    b = b || .5;
 
                     this.poly3d = [
-                        $Y( this, function( p ) {p.pointAdd( [[ a, 0, -a], [-a, 0, -a], [0, -b, 0]] );} ),
-                        $Y( this, function( p ) {p.pointAdd( [[-a, 0, -a], [-a, 0,  a], [0, -b, 0]] );} ),
-                        $Y( this, function( p ) {p.pointAdd( [[ a, 0,  a], [ a, 0, -a], [0, -b, 0]] );} ),
-                        $Y( this, function( p ) {p.pointAdd( [[-a, 0,  a], [ a, 0,  a], [0, -b, 0]] );} )
+                        $Y( this, function( p ) {p.pointAdd( [[-a,  a, 0], [-a, -a, 0], [ 0, 0, b]] );} ),
+                        $Y( this, function( p ) {p.pointAdd( [[-a, -a, 0], [ a, -a, 0], [ 0, 0, b]] );} ),
+                        $Y( this, function( p ) {p.pointAdd( [[ a,  a, 0], [-a,  a, 0], [ 0, 0, b]] );} ),
+                        $Y( this, function( p ) {p.pointAdd( [[ a, -a, 0], [ a,  a, 0], [ 0, 0, b]] );} ),
+                        $Y( this, function( p ) {p.pointAdd( [[ a, -a, 0], [ a,  a, 0], [-a, a, 0], [-a, -a, 0]] );} )
                     ];
+                }
+            } ),
+
+            Sphere: new Class( {
+                $extends: $B,
+
+                initialize: function( par, frontcol, backcol, strokecol, strokeweight, opacity, r, detail ) {
+                    this.$super( par, frontcol, backcol, strokecol, strokeweight, opacity );
+
+                    r      = r      || 1.0;
+                    detail = detail || 4;
+
+                    var self    = this;
+                    var ln      = r / SQRT_3;
+                    var points  = [[SQRT_2 * -ln, ln, 0], [SQRT_2 *  ln, ln, 0], [0, -ln, SQRT_2 * -ln], [0, -ln, SQRT_2 *  ln]];
+                    var virtual = [[0, 1, 3], [1, 2, 3], [0, 2, 1], [0, 3, 2]];
+                    var mul, new_x, new_y, new_z, n, lines, new_poly, proceeded;
+
+                    for ( var i = 0; i < detail; i++ ) {
+                        new_poly  = [];
+                        proceeded = [];
+
+                        $each( virtual, function( pt ) {
+                            n     = [];
+                            lines = [[M.min( pt[0], pt[1] ), M.max( pt[0], pt[1] )], [M.min( pt[1], pt[2] ), M.max( pt[1], pt[2] )], [M.min( pt[2], pt[0] ), M.max( pt[2], pt[0] )]];
+
+                            $each( lines, function( line ) {
+                                if ( $t( proceeded[line[0]] ) == 'undefined' ) {
+                                    proceeded[line[0]] = [];
+                                }
+
+                                if ( $t( proceeded[line[0]][line[1]] ) == 'undefined' ) {
+                                    new_x = ( points[line[0]][0] + points[line[1]][0] ) / 2;
+                                    new_y = ( points[line[0]][1] + points[line[1]][1] ) / 2;
+                                    new_z = ( points[line[0]][2] + points[line[1]][2] ) / 2;
+                                    mul   = r / M.sqrt( M.pow( new_x, 2 ) + M.pow( new_y, 2 ) + M.pow( new_z, 2 ) );
+
+                                    points.push( [new_x * mul, new_y * mul, new_z * mul] );
+                                    proceeded[line[0]][line[1]] = points.length - 1;
+                                }
+                
+                                n.push( proceeded[line[0]][line[1]] );
+                            } );
+
+                            new_poly.push( [pt[0], n[0], n[2]] );
+                            new_poly.push( [pt[1], n[1], n[0]] );
+                            new_poly.push( [pt[2], n[2], n[1]] );
+                            new_poly.push( [ n[0], n[1], n[2]] );
+                        } );
+
+                        virtual = new_poly;
+                    }
+
+                    $each( virtual, function( pt ) {
+                        $Y( self, function( p ) {p.pointAdd( [points[pt[0]], points[pt[1]], points[pt[2]]] );} );
+                    } );
                 }
             } ),
 
             Spline: new Class( {
                 $extends: $B,
 
-                initialize: function( par, frontcol, backcol, strokecol, strokeweight, bsi ) {
+                initialize: function( par, frontcol, backcol, strokecol, strokeweight, bsi, size ) {
                     this.$super( par, frontcol, backcol, strokecol, strokeweight );
 
-                    bsi = bsi || 4;
+                    bsi  = bsi  || 4;
+                    size = size || 50;
 
-                    for ( x = -50, p1 = 0; x <= ( 50 - bsi ); x += bsi, p1++ ) {
+                    for ( x = -size, p1 = 0; x <= ( size - bsi ); x += bsi, p1++ ) {
                         this.poly3d[p1] = $Y( this, function( p ) {
                             p.pointAdd( [[x, x, x], [x + bsi, x + bsi, x + bsi]] );
                         } );
@@ -3532,27 +4428,35 @@
 
 
     // expose bare minimum
-    w.Filippo = {
-        objects:    objects,
-        navigators: navigators,
-        ext:        {},
+    window.Filippo = {
+        Class:         Class,
+        Client:        Client,
+        Util:          Util,
+        Evt:           Evt,
+        Transition:    Transition,
+        Animation:     Animation,
+        Vertex:        Vertex,
+        Edge:          Edge,
+        Triangle:      Triangle,
+        Vector:        Vector,
+        Coordinate:    Coordinate,
+        Matrix:        Matrix,
+        Line:          Line,
+        Plane:         Plane,
+        Scene:         Scene,
+        Poly:          Poly,
+        BaseObject:    BaseObject,
+        CoordPlane:    CoordPlane,
 
-        Client:     Client,
-        Util:       Util,
-        Transition: Transition,
-        Animation:  Animation,
-        Vector:     Vector,
-        Coordinate: Coordinate,
-        Matrix:     Matrix,
-        Line:       Line,
-        Plane:      Plane,
-        Scene:      Scene,
-        Poly:       Poly,
-        Grid:       Grid,
-        BaseObject: BaseObject,
-        CoordPlane: CoordPlane,
+        navigators:    navigators,
+        boundingboxes: boundingboxes,
+        objects:       objects,
+        extensions:    {},
 
         // shortcuts
+        $X: $X,
+        $E: $E,
+        $T: $T,
         $V: $V,
         $C: $C,
         $M: $M,

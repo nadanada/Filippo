@@ -1,0 +1,87 @@
+<html>
+<head>
+
+<title>Filippo Examples: Chart</title>
+
+<style type="text/css">
+
+body {
+    background-color: #000;
+    color: #bfbfbf;
+    font-size: 12px;
+    font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Arial, sans-serif;    
+}
+
+</style>
+
+<script language="JavaScript" type="text/javascript" src="../filippo.js"></script>
+<script language="JavaScript" type="text/javascript">
+
+window.onload = function() {
+    var scene = new Filippo.Scene( 'mycanvas' );
+    scene.setNavigator( Filippo.navigators.KeyboardRotator );
+    scene.zoom.y = 8 / ( Date.UTC( 2002, 8, 15, 0, 0, 0 ) - Date.UTC( 2002, 0, 15, 0, 0, 0 ) ); 
+    scene.zoom.z = 0.1;
+    
+    var b, bb = scene.setBoundingBox( Filippo.boundingboxes.Grid, {
+        fillcolor:   '#999999',
+        strokecolor: '#c0c0c0'
+    } );
+    
+    var color = ['#0000ff', '#0080ff', '#00ffff'];
+    var price = new Array( 3 );
+    var i, j;
+
+    for ( i = 0; i < 3; i++ ) {
+        price[i] = new Array( 8 );
+    }
+  
+    for ( i = 0; i < 3; i++ ) {
+        price[i][0] = 60 - 20 * i + Filippo.Util.rnd( 5 );
+    
+        for ( j = 1; j <= 7; j++ ) {
+            price[i][j] = price[i][j - 1] + Filippo.Util.rnd( 10 ) - 4 + 2 * i - Filippo.Util.rnd( 2 * i + 1 );
+          
+            b = new Filippo.objects.Box( scene, color[i], color[i], '#000000', 1, 100, i + 0.7, Date.UTC( 2002, j - 1, 23, 0, 0, 0 ), 0, i + 1.3, Date.UTC( 2002, j, 9, 0, 0, 0 ), price[i][j] );
+            b.bindEvent( 'mouseover', function( evt ) {
+                Filippo.Util.identifyObject( evt, this ).setOpacity( 50 );
+                scene.render();
+            } );
+            b.bindEvent( 'mouseout', function( evt ) {
+                Filippo.Util.identifyObject( evt, this ).setOpacity( 100 );
+                scene.render();
+            } );
+        }
+    }
+
+    scene.centerAuto();
+    scene.distance *= 1.8;
+    scene.ym += 50;
+    scene.zoom_all *= 0.9;
+
+    bb.setBorder( 0, Date.UTC( 2002, 0, 2, 0, 0, 0 ), 0, 4, Date.UTC( 2002, 7, 30, 0, 0, 0 ), 70 );
+    bb.delta.x = 1;
+    bb.scale.set( function( x ) {
+        if ( x == 1 ) return( 'Apples'  );
+        if ( x == 2 ) return( 'Oranges' );
+        if ( x == 3 ) return( 'Bananas' );
+
+        return '';
+    }, 4, '$' );
+
+    bb.label.set( '', '', 'Price' );
+
+    scene.changeView( -40, 60 );
+    scene.changeLight( -30, 30 );
+    scene.order_weight.z = 0.05;
+    scene.render();
+};
+
+</script>
+</head>
+
+<body>
+    <p>Arrow keys to rotate, CTRL + arrow keys to shift, ALT + arrow keys to change light position, CMD + arrow keys to zoom scene/viewer</p>
+    <div id="mycanvas" style="position: relative; width:500; height:500; overflow: hidden;"></div>
+</body>
+</html>

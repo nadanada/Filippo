@@ -1,0 +1,86 @@
+<html>
+<head>
+
+<title>Filippo Examples: Objects</title>
+
+<style type="text/css">
+
+body {
+    background-color: #000;
+    color: #bfbfbf;
+    font-size: 12px;
+    font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Arial, sans-serif;    
+}
+
+</style>
+
+<script language="JavaScript" type="text/javascript" src="../filippo.js"></script>
+<script language="JavaScript" type="text/javascript">
+
+var scene, is_rotating = false;
+
+function rotate() {
+    if ( !is_rotating ) {
+        return;
+    }
+
+    scene.changeView( 0, -5 );
+    scene.changeLight( 0, -5 );
+    scene.render();
+
+    window.setTimeout( 'rotate()', 10 );
+};
+
+function startStop() {
+    if ( is_rotating ) {
+        is_rotating = false;
+        document.getElementById( 'start_stop' ).value = 'rotate';
+    } else {
+        is_rotating = true;
+        document.getElementById( 'start_stop' ).value = 'stop';
+
+        rotate();
+    }
+};
+
+window.onload = function() {
+    var o;
+    scene = new Filippo.Scene( 'mycanvas' );
+
+    o = new Filippo.objects.Dodecahedron( scene, '#00ff80', '#00ff00', '#004000', 1, 50 );
+
+    o = new Filippo.objects.Tetrahedron( scene, '#00ff80', '#00ff00', '#004000', 1, 50, .5 );
+    o.shift( 1, 1, 1 );
+
+    o = new Filippo.objects.Octahedron( scene, '#00ff80', '#00ff00', '#004000', 1, 50 );
+    o.shift( -1, 1, -1 );
+
+    o = new Filippo.objects.Cube( scene, '#00ff80', '#00ff00', '#004000', 1, 50, .4 );
+    o.shift( 1, -1, -1 );
+
+    o = new Filippo.objects.Icosahedron( scene, '#00ff80', '#00ff00', '#004000', 1, 50 );
+    o.shift( -1, -1, 1 );
+
+    o = new Filippo.objects.Cone( scene, '#00ff80', '#00ff00', '#004000', 1, 50 );
+    o.shift( -1, -1, -1 );
+
+    o = new Filippo.objects.Pyramid( scene, '#00ff80', '#00ff00', '#004000', 1, 50 );
+    o.shift( 1, 1, -1 );
+
+    scene.centerAuto();
+    scene.center.zoom( 0.0 );
+    scene.zoom_all *= 1.4;
+    scene.changeView( -15, 0 );
+    scene.changeLight( -20, -30 );
+    scene.render();
+};
+
+</script>
+
+</head>
+
+<body>
+    <input type="button" id="start_stop" value="rotate" onclick="startStop()" />
+    <div id="mycanvas" style="position: relative; width:500; height:500; overflow: hidden;"></div>
+</body>
+</html>
